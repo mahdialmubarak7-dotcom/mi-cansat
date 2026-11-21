@@ -23,7 +23,7 @@ document.addEventListener('click',e=>{if(nav.classList.contains('open')&&!nav.co
 const linkFor=id=>$(`#navlinks a[href="#${id}"]`);
 function setActive(id){$$('#navlinks a').forEach(a=>a.classList.toggle('active',a.getAttribute('href')==='#'+id))}
 const watched=['cansat','primary','secondary','applications','orbit','contact'].map(id=>document.getElementById(id));
-const sio=new IntersectionObserver(es=>{if(location.hash==='#team')return;
+const sio=new IntersectionObserver(es=>{if(location.hash==='#team'||location.hash==='#play')return;
   es.forEach(e=>{if(e.isIntersecting&&linkFor(e.target.id))setActive(e.target.id)})},{rootMargin:'-45% 0px -50% 0px'});
 watched.forEach(s=>s&&sio.observe(s));
 
@@ -125,27 +125,34 @@ watched.forEach(s=>s&&sio.observe(s));
 (function(){
   const M=[
   {k:'MCR',n:'Mission Concept Review',d:[2026,10,1],l:'Sun 1 Nov',c:'#4a44b0',i:'bulb',b:['Mission objectives','Success criteria','Team roles'],kick:'Technical session #1, MCR kickoff, Sun 25 Oct',del:'MCR presentation covering mission objectives, success criteria and team roles.'},
-  {k:'PDR',n:'Preliminary Design Review',d:[2026,10,15],l:'Sun 15 Nov',c:'#1d56d6',i:'compass',b:['Preliminary design','Block diagram','Mass, power and link budgets','Initial CAD'],kick:'Technical session #2, PDR kickoff, Sun 1 Nov',del:'PDR presentation covering the preliminary design and concept of operations.'},
-  {k:'CDR',n:'Critical Design Review',d:[2026,10,22],l:'Sun 22 Nov',c:'#0f8a78',i:'cog',b:['Detailed design','Integration and test plan'],kick:'Technical session #7, CDR kickoff, Sun 15 Nov',del:'CDR presentation covering the detailed design with an integration and test plan.'},
-  {k:'SIR/FRR',n:'System Integration & Flight Readiness Review',d:[2026,11,9],l:'Wed 9 Dec',c:'#7b3fe0',i:'rocket',b:['Integrated and tested CanSat','Ready for deployment'],kick:'Technical session #8, SIR & FRR kickoff, Sun 22 Nov',del:'SIR/FRR presentation with a fully integrated and tested CanSat, then final technical sign-off.'},
-  {k:'FINAL',n:'Mission Results Presentation',d:[2026,11,12],l:'Sat 12 Dec',c:'#e1001a',i:'trophy',b:['On launch day, after recovery','Part of the final score'],kick:'Launch day, Sat 12 Dec',del:'Mission results presented by the whole team after recovery. Counts toward the final score.'}];
+  {k:'PDR',n:'Preliminary Design Review',d:[2026,10,22],l:'Sun 22 Nov',c:'#1d56d6',i:'compass',b:['Preliminary design','Block diagram','Mass, power and link budgets','Initial CAD'],kick:'Technical session #2, PDR kickoff, Sun 1 Nov',del:'PDR presentation covering the preliminary design and concept of operations.'},
+  {k:'CDR',n:'Critical Design Review',d:null,l:'TBD',c:'#0f8a78',i:'cog',b:['Detailed design','Integration and test plan'],kick:'Technical session #7, CDR kickoff, date TBD',del:'CDR presentation covering the detailed design with an integration and test plan.'},
+  {k:'SIR/FRR',n:'System Integration & Flight Readiness Review',d:null,l:'TBD',c:'#7b3fe0',i:'rocket',b:['Integrated and tested CanSat','Ready for deployment'],kick:'Technical session #8, SIR & FRR kickoff, date TBD',del:'SIR/FRR presentation with a fully integrated and tested CanSat, then final technical sign-off.'},
+  {k:'FINAL',n:'Mission Results Presentation',d:null,l:'TBD',c:'#e1001a',i:'trophy',b:['On launch day, after recovery','Part of the final score'],kick:'Launch day, date TBD',del:'Mission results presented by the whole team after recovery. Counts toward the final score.'}];
   const ic=(n,c='ic')=>`<svg class="${c}"><use href="#i-${n}"/></svg>`;
-  const day=864e5,start=new Date(2026,9,25),end=new Date(2026,11,12),now=new Date(),t0=new Date(now.getFullYear(),now.getMonth(),now.getDate());
-  const pos=d=>Math.min(1,Math.max(0,(d-start)/(end-start)));
-  M.forEach(m=>{m.date=new Date(m.d[0],m.d[1],m.d[2]);m.days=Math.round((m.date-t0)/day)});
-  const nx=M.findIndex(m=>m.days>=0);
-  M.forEach((m,i)=>{m.st=m.days<0?'Review held':i===nx?'Up next':'Upcoming';m.si=m.days<0?'check':i===nx?'hourglass':'clock';
+  const day=864e5,start=new Date(2026,9,25),now=new Date(),t0=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  M.forEach(m=>{m.tbd=!m.d;m.date=m.tbd?null:new Date(m.d[0],m.d[1],m.d[2]);m.days=m.tbd?null:Math.round((m.date-t0)/day)});
+  // Dated milestones fill the first part of the track by date; TBD milestones are spaced evenly after them.
+  const dated=M.filter(m=>!m.tbd),tbds=M.filter(m=>m.tbd),last=dated.length?dated[dated.length-1].date:start;
+  const span=tbds.length?.45:1,lastPos=tbds.length?span:1;
+  const pos=d=>Math.min(lastPos,Math.max(0,(d-start)/((last-start)||1)*span));
+  tbds.forEach((m,j)=>{m.p=span+(1-span)*(j+1)/tbds.length});
+  const nx=M.findIndex(m=>m.tbd||m.days>=0);
+  M.forEach((m,i)=>{
+    if(m.tbd){m.st=i===nx?'Up next':'Date TBD';m.si=i===nx?'hourglass':'clock';m.when='date to be confirmed';return}
+    m.st=m.days<0?'Review held':i===nx?'Up next':'Upcoming';m.si=m.days<0?'check':i===nx?'hourglass':'clock';
     m.when=m.days<0?'review date passed':m.days===0?'today':m.days===1?'tomorrow':'in '+m.days+' days'});
-  const nodes=[{k:'Induction',l:'Sun 25 Oct',date:start,c:'#e8eefc',done:t0>=start}].concat(M.map(m=>({k:m.k,l:m.l,date:m.date,c:m.c,done:m.days<0})));
-  $('#tl').innerHTML='<div class="in"><div class="tr"></div><div class="fl" style="width:'+pos(t0)*100+'%"></div>'+
-    nodes.map((n,i)=>{const p=pos(n.date)*100;return '<div class="row"><span class="nd" style="left:'+p+'%;border-color:'+n.c+';background:'+(n.done?n.c:'var(--bg)')+'"></span><span class="nl '+(i%2?'dn':'up')+'" style="left:'+p+'%">'+n.k+'</span><small>'+n.l+'</small></div>'}).join('')+
-    '</div><p class="tn">'+ic('calendar')+'Today is '+t0.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})+'. The red line shows how far through the competition we are.</p>';
+  const nodes=[{k:'Induction',l:'Sun 25 Oct',p:0,c:'#e8eefc',done:t0>=start}].concat(M.map(m=>({k:m.k,l:m.l,p:m.tbd?m.p:pos(m.date),c:m.c,done:!m.tbd&&m.days<0})));
+  const fill=t0>last?Math.min(lastPos+.03,1):pos(t0);
+  $('#tl').innerHTML='<div class="in"><div class="tr"></div><div class="fl" style="width:'+fill*100+'%"></div>'+
+    nodes.map((n,i)=>{const p=n.p*100;return '<div class="row"><span class="nd" style="left:'+p+'%;border-color:'+n.c+';background:'+(n.done?n.c:'var(--bg)')+'"></span><span class="nl '+(i%2?'dn':'up')+'" style="left:'+p+'%">'+n.k+'</span><small>'+n.l+'</small></div>'}).join('')+
+    '</div><p class="tn">'+ic('calendar')+'Today is '+t0.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})+'. The red line shows how far through the competition we are. Dates marked TBD are still to be confirmed.</p>';
   const ms=$('#ms'),det=$('#det');let sel=Math.max(0,nx);
   function draw(focus){
     ms.innerHTML=M.map((m,i)=>'<button class="mc'+(i===sel?' on':'')+'" role="tab" aria-selected="'+(i===sel)+'" data-i="'+i+'" style="--c:'+m.c+'"><span class="mh"><span><b class="disp">'+m.k+'</b><small>'+m.n+'</small></span>'+ic(m.i)+'</span><ul>'+m.b.map(x=>'<li>'+x+'</li>').join('')+'</ul><span class="mf"><b>'+m.l+'</b><em>'+ic(m.si)+m.st+'</em></span></button>').join('');
     const m=M[sel];det.style.setProperty('--c',m.c);
     det.innerHTML='<h3>'+ic(m.i)+m.k+', '+m.n+'</h3><div class="dg">'+
-      '<div><span class="ico">'+ic('calendar')+'</span><div><small>Review</small><p>'+m.l+', '+m.when+'. Status: '+m.st+'.</p></div></div>'+
+      '<div><span class="ico">'+ic('calendar')+'</span><div><small>Review</small><p>'+(m.tbd?'Date to be confirmed':m.l+', '+m.when)+'. Status: '+m.st+'.</p></div></div>'+
       '<div><span class="ico">'+ic('flag')+'</span><div><small>Kickoff</small><p>'+m.kick+'</p></div></div>'+
       '<div><span class="ico">'+ic('file')+'</span><div><small>What we submit</small><p>'+m.del+'</p></div></div></div>';
     if(focus)ms.querySelector('.on').focus()}
@@ -181,7 +188,7 @@ watched.forEach(s=>s&&sio.observe(s));
 
   /* Fig 0.1: the payload as a stack of plates; hover a layer and everything above it lifts */
   makeFig(figs[0],F=>{
-    const names=['Battery','433 MHz LoRa radio','Flight computer','Sensors','Camera'],n=names.length,sz=130,th=13,step=24,L=34;
+    const names=['Battery','433 MHz LoRa radio','Flight computer','Sensors','Cameras'],n=names.length,sz=130,th=13,step=24,L=34;
     const o=[140,64+((n-1)*step+th)+L];F.svg.setAttribute('viewBox','0 0 280 '+Math.ceil(o[1]+sz+8));
     const plates=[];
     for(let i=0;i<n;i++){
@@ -210,15 +217,15 @@ watched.forEach(s=>s&&sio.observe(s));
   makeFig(figs[1],F=>{
     const u=58,gp=12,o=[118,104];F.svg.setAttribute('viewBox','0 0 280 300');
     const cubes=[
-      {x:0,y:0,h:74,n:'Images'},{x:u+gp,y:0,h:50,n:'Timestamps'},{x:2*(u+gp),y:0,h:62,n:'Temperature'},
-      {x:0,y:u+gp,h:56,n:'Humidity'},{x:u+gp,y:u+gp,h:70,n:'Altitude'},{x:2*(u+gp),y:u+gp,h:42,n:'PM2.5'}];
+      {x:0,y:0,h:74,n:'CO₂'},{x:u+gp,y:0,h:50,n:'Timestamps'},{x:2*(u+gp),y:0,h:62,n:'Temperature'},
+      {x:0,y:u+gp,h:56,n:'Humidity'},{x:u+gp,y:u+gp,h:70,n:'Altitude'},{x:2*(u+gp),y:u+gp,h:42,n:'GPS position'}];
     const pats=[
-      (c,r,t)=>{const fl=(t%2.4)<.18;return fl||r===0||r===4||c===0||c===4?(fl?1:.85):(c===2&&r===2?1:0)},                       // camera frame + flash
+      (c,r,t)=>{const v=Math.sin((c*12.9898+r*78.233+Math.floor(t*4)*3.7)*43758.5453);return (v-Math.floor(v))>.7?1:0},           // drifting gas molecules
       (c,r,t)=>{const a=t*2.1;for(let k=0;k<=2;k++){if(c===2+Math.round(Math.cos(a)*k)&&r===2+Math.round(Math.sin(a)*k))return 1}return (r===0||r===4||c===0||c===4)&&(c+r)%2===0?.35:0}, // clock hand
       (c,r,t)=>{const lv=2+Math.round(1.6+1.4*Math.sin(t*1.3));return (c===2&&4-r<lv)||(r===4&&c>0&&c<4)?1:0},                     // thermometer
       (c,r,t)=>{const col=[1,3,0,4],o2=[0,.55,.3,.8];for(let j=0;j<4;j++){if(c===col[j]&&r===Math.floor(((t*1.4+o2[j]*5)%5)))return 1}return 0}, // drops
       (c,r,t)=>{const p=(t*1.25)%6,y=Math.floor(p);return c===2&&(r===y?1:(r===y-1?.45:0))},                                        // falling CanSat
-      (c,r,t)=>{const v=Math.sin((c*12.9898+r*78.233+Math.floor(t*6)*3.7)*43758.5453);return (v-Math.floor(v))>.66?1:0}           // dust noise
+      (c,r,t)=>{const on=(t%1.2)<.6;return c===2&&r===2?(on?1:.3):((c===2||r===2)&&!(c===0||c===4||r===0||r===4)?.6:(((c===0||c===4)&&(r===0||r===4))?.35:0))} // GPS crosshair
     ];
     const order=cubes.map((q,i)=>i).sort((a,b)=>(cubes[a].x+cubes[a].y)-(cubes[b].x+cubes[b].y));
     order.forEach(i=>{const q=cubes[i],g=el('g',{class:'cb'},F.svg);box(g,o,q.x,q.y,0,u,u,q.h);
@@ -345,9 +352,10 @@ watched.forEach(s=>s&&sio.observe(s));
 })();
 
 /* ---------- team view routing ---------- */
-(function(){const tv=$('#team'),home=$('#home');let open=null;
-  function route(){const t=location.hash==='#team';const was=open;open=t;tv.hidden=!t;home.hidden=t;
-    if(t){scrollTo(0,0);setActive('team')}
+(function(){const views={team:$('#team'),play:$('#play')},home=$('#home');let open=null;
+  function route(){const h=location.hash.slice(1),t=views[h]?h:'';const was=open;open=t;
+    for(const v in views)if(views[v])views[v].hidden=v!==t;home.hidden=!!t;
+    if(t){scrollTo(0,0);setActive(t)}
     else{if(was)setActive('');
       const id=location.hash.slice(1),el=id&&document.getElementById(id);
       if(was&&el)requestAnimationFrame(()=>el.scrollIntoView());else if(was)scrollTo(0,0)}
