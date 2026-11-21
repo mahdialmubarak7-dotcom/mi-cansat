@@ -8,7 +8,8 @@
 'use strict';
 const view=document.getElementById('play');if(!view)return;
 const q=s=>view.querySelector(s);
-const stage=q('#gstage'),cv=q('#gcv'),ctx=cv.getContext('2d');
+const stage=q('#gstage'),box=q('#gbox'),cv=q('#gcv'),ctx=cv.getContext('2d');
+const small=matchMedia('(max-width: 900px), (pointer: coarse)');
 const hud=q('#ghud'),elScore=q('#gscore'),elBest=q('#gbest');
 const pCustom=q('#gcustom'),pPause=q('#gpaused'),pOver=q('#gover');
 
@@ -46,10 +47,10 @@ function flag(c,x,y,w,h){c.fillStyle='#ce1126';c.fillRect(x,y,w,h);c.fillStyle='
 
 /* ---------- canvas sizing ---------- */
 let k=1,sky=null;
-function resize(){const r=stage.getBoundingClientRect();if(!r.width)return;
+function resize(){const r=box.getBoundingClientRect();if(!r.width)return;
   const dpr=Math.min(2,window.devicePixelRatio||1);k=r.width/W*dpr;
   cv.width=Math.round(W*k);cv.height=Math.round(H*k);sky=null;render()}
-const gameRO=new ResizeObserver(resize);gameRO.observe(stage);
+const gameRO=new ResizeObserver(resize);gameRO.observe(box);
 
 /* ---------- static background: Manama skyline over Bahrain Bay at dusk ---------- */
 function buildSky(){
@@ -255,7 +256,10 @@ let shownScore=-1,shownBest=-1;
 function hudUpdate(force){const best=Math.max(save.best,score);
   if(force||score!==shownScore){elScore.textContent=score;shownScore=score}
   if(force||best!==shownBest){elBest.textContent=best;shownBest=best}}
-function show(p){[pCustom,pPause,pOver].forEach(x=>{x.hidden=x!==p});hud.hidden=!(state==='intro'||state==='play'||state==='pause'||state==='crash')}
+function setMode(){const full=small.matches&&state!=='custom'&&location.hash==='#play';
+  stage.classList.toggle('live',state==='intro'||state==='play'||state==='pause'||state==='crash');
+  stage.classList.toggle('full',full);document.documentElement.classList.toggle('glock',full)}
+function show(p){[pCustom,pPause,pOver].forEach(x=>{x.hidden=x!==p});hud.hidden=!(state==='intro'||state==='play'||state==='pause'||state==='crash');setMode()}
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function renderBoard(){const ol=q('#gboard');if(!ol)return;
   ol.innerHTML=save.board.length?save.board.map(e=>`<li${e.id===lastId?' class="me"':''}><span>${esc(e.n)}</span><b>${e.s}</b></li>`).join('')
@@ -264,7 +268,7 @@ function renderBoard(){const ol=q('#gboard');if(!ol)return;
 function start(){reset();state='intro';introT=0;show(null);hudUpdate(true);
   if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
   stage.focus({preventScroll:true});
-  const r=stage.getBoundingClientRect();if(r.top<0||r.bottom>innerHeight)stage.scrollIntoView({block:'center',behavior:RM?'auto':'smooth'})}
+  if(!stage.classList.contains('full')){const r=stage.getBoundingClientRect();if(r.top<0||r.bottom>innerHeight)stage.scrollIntoView({block:'center',behavior:RM?'auto':'smooth'})}}
 function pause(){if(state!=='play'&&state!=='intro')return;pausedFrom=state;state='pause';keys.l=keys.r=false;show(pPause);q('#gresume').focus({preventScroll:true})}
 function resume(){if(state!=='pause')return;state=pausedFrom;show(null);stage.focus({preventScroll:true})}
 function crash(){state='crash';crashT=0;shake=RM?0:9;burst(can.x,canY,['#ff2a45','#ffd84a','#ffffff',BODY[save.body].c],28,220)}
@@ -305,18 +309,22 @@ addEventListener('keydown',e=>{if(view.hidden||(e.target&&e.target.tagName==='IN
 addEventListener('keyup',e=>{const k=e.key;if(k==='ArrowLeft'||k==='a'||k==='A')keys.l=false;if(k==='ArrowRight'||k==='d'||k==='D')keys.r=false});
 const toX=e=>{const r=cv.getBoundingClientRect();return (e.clientX-r.left)/r.width*W};
 let touching=false;
-cv.addEventListener('pointerdown',e=>{if(!playing())return;touching=true;ptr=toX(e);try{cv.setPointerCapture(e.pointerId)}catch(err){}e.preventDefault()});
-cv.addEventListener('pointermove',e=>{if(!playing())return;if(touching||e.pointerType==='mouse')ptr=toX(e)});
+// steer by touching or dragging anywhere on the game (on phones the game fills the screen)
+const onUI=e=>e.target.closest&&e.target.closest('button,input,.gpanel');
+stage.addEventListener('pointerdown',e=>{if(!playing()||onUI(e))return;touching=true;ptr=clamp(toX(e),0,W);try{stage.setPointerCapture(e.pointerId)}catch(err){}e.preventDefault()});
+stage.addEventListener('pointermove',e=>{if(!playing())return;if(touching||e.pointerType==='mouse')ptr=clamp(toX(e),0,W)});
 const lift=e=>{touching=false;if(e.pointerType!=='mouse')ptr=null};
-cv.addEventListener('pointerup',lift);cv.addEventListener('pointercancel',lift);
-cv.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse'&&!touching)ptr=null});
+stage.addEventListener('pointerup',lift);stage.addEventListener('pointercancel',lift);
+stage.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse'&&!touching)ptr=null});
+stage.addEventListener('contextmenu',e=>{if(playing())e.preventDefault()});
+if(small.addEventListener)small.addEventListener('change',setMode);
 
 /* ---------- loop: runs only while the game page is open ---------- */
 let running=false,lastTs=0;
 function frame(ts){if(!running)return;const dt=Math.min(.05,Math.max(0,(ts-lastTs)/1000));lastTs=ts;update(dt);render();requestAnimationFrame(frame)}
 function startLoop(){if(running)return;running=true;lastTs=performance.now();requestAnimationFrame(frame)}
 function stopLoop(){running=false}
-function onRoute(){if(location.hash==='#play'){startLoop();resize()}else{pause();stopLoop()}}
+function onRoute(){if(location.hash==='#play'){startLoop();resize()}else{pause();stopLoop()}setMode()}
 addEventListener('hashchange',onRoute);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)pause()});
 renderBoard();hudUpdate(true);show(pCustom);onRoute();
